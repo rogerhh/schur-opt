@@ -1,4 +1,5 @@
 *.exe
 *.out
 *.log
+data/
 build/
