@@ -22,17 +22,22 @@ public:
 
 private:
 
-    int block_size = 3;
+    const int block_size = 3;
+    const int block_squared = block_size * block_size;
     int omp_num_threads = 0;
+    int L = -1, P = -1;
 
     // 5-4-2022: Decided on using row-major matrices
     std::vector<std::vector<double>> A_sparse;
-    std::vector<double> B;  // C is B^T
-    std::vector<double> D;
+    std::vector<std::vector<double>> B;  // C is B^T
+    std::vector<bool> B_used;  // C is B^T
+    std::vector<std::vector<double>> D;
+    std::vector<bool> D_used;
     std::vector<double> b1;
     std::vector<double> b2;
 
-    std::vector<double> Dschur;
+    std::vector<std::vector<double>> Dschur;
+    std::vector<bool> Dschur_used;
     std::vector<double> bschur;
 };
 
