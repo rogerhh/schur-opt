@@ -28,11 +28,19 @@ private:
     int L = -1, P = -1;
 
     // 5-4-2022: Decided on using row-major matrices
+    // A_sparse is block diagonal
+    // Each A_sparse entry is the block matrix in row-major order
     std::vector<std::vector<double>> A_sparse;
-    std::vector<std::vector<double>> B;  // C is B^T
-    std::vector<bool> B_used;  // C is B^T
+    
+    // B stored in 2D row major, C is B^T
+    std::vector<std::vector<double>> B;  
+    std::vector<bool> B_used;  
+
+    // D stored in 2D row major
     std::vector<std::vector<double>> D;
     std::vector<bool> D_used;
+
+    // b are vectors
     std::vector<double> b1;
     std::vector<double> b2;
 
