@@ -28,7 +28,7 @@ inline int pair_to_idx(const int r, const int c, const int max_r, const int max_
 }
 
 
-void SchurOpt::read_sparse(const string& fname, SchurOpt& schur_opt, WhichBlock which_block) {
+void SchurOpt::read_sparse(const string& fname, WhichBlock which_block) {
     ifstream fin(fname);
 
     if(!fin.is_open()) {

@@ -40,9 +40,9 @@ int main(int argc, char** argv) {
             cout << A_fname << ", " << B_fname << ", " << D_fname << ", " << b_fname << ", " 
                  << Dschur_fname << ", " << bschur_fname << endl;
 
-            schur_opt.read_sparse(A_fname, schur_opt, SchurOpt::WhichBlock::isA);
-            schur_opt.read_sparse(B_fname, schur_opt, SchurOpt::WhichBlock::isC);
-            schur_opt.read_sparse(D_fname, schur_opt, SchurOpt::WhichBlock::isD);
+            schur_opt.read_sparse(A_fname, SchurOpt::WhichBlock::isA);
+            schur_opt.read_sparse(B_fname, SchurOpt::WhichBlock::isC);
+            schur_opt.read_sparse(D_fname, SchurOpt::WhichBlock::isD);
 
         }
 

@@ -1,5 +1,5 @@
-#ifndef SCHUR_OPT_H
-#define SCHUR_OPT_H
+#ifndef SCHUR_OPT_GPU_H
+#define SCHUR_OPT_GPU_H
 
 #include <vector>
 #include <string>
@@ -8,9 +8,7 @@ class SchurOpt {
 
 public:
 
-    SchurOpt(int omp_num_threads_in)
-    : omp_num_threads(omp_num_threads_in)
-    {}
+    // SchurOpt() {}
 
     enum WhichBlock { isA, isB, isC, isD };
 
@@ -18,7 +16,7 @@ public:
     void to_g2o(/* parameters */);
 
     void compute_schur(/* parameters */);
-    void read_sparse(const std::string& fname, WhichBlock which_block);
+    void read_sparse(const std::string& fname, SchurOpt& schur_opt, WhichBlock which_block);
 
 private:
 
