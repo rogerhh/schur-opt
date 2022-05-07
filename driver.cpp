@@ -11,7 +11,7 @@ using namespace std;
 
 int main(int argc, char** argv) {
 
-    for(int num_cores = 0; num_cores < 24; num_cores += 2) {
+    for(int num_cores = 0; num_cores < 32; num_cores += 2) {
         int opt = -1;
         int omp_num_threads = num_cores;
 
@@ -28,7 +28,7 @@ int main(int argc, char** argv) {
 
         SchurOpt schur_opt(omp_num_threads);
 
-        string list_fname = "/app/schur_opt/filelist.csv";
+        string list_fname = "filelist_sample.csv";
         ifstream list_fin(list_fname);
         if(!list_fin.is_open()) {
             cerr << "Error opening file: " << list_fname << endl;
