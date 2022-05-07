@@ -1,5 +1,7 @@
 *.exe
 *.out
 *.log
+*.swp
+*.un~
 data/
 build/
