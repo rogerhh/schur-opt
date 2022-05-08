@@ -12,7 +12,7 @@ public:
     : omp_num_threads(omp_num_threads_in)
     {}
 
-    enum WhichBlock { isA, isB, isC, isD };
+    enum WhichBlock { isA, isB, isC, isD, isDschur };
 
     void from_g2o(/* parameters */);
     void to_g2o(/* parameters */);
@@ -47,6 +47,8 @@ private:
     std::vector<std::vector<double>> Dschur;
     std::vector<bool> Dschur_used;
     std::vector<double> bschur;
+
+    std::vector<std::vector<double>> Dschur_correct;
 };
 
 #endif

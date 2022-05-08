@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     // initialize solver based on num_threads set
     SchurOpt schur_opt(omp_num_threads);
 
-    string list_fname = "filelist_sample.csv";
+    string list_fname = "../filelist.csv";
     ifstream list_fin(list_fname);
     if(!list_fin.is_open()) {
         cerr << "Error opening file: " << list_fname << endl;
@@ -46,6 +46,7 @@ int main(int argc, char** argv) {
         schur_opt.read_sparse(A_fname, schur_opt, SchurOpt::WhichBlock::isA); // Hll
         schur_opt.read_sparse(C_fname, schur_opt, SchurOpt::WhichBlock::isC); // Hpl
         schur_opt.read_sparse(D_fname, schur_opt, SchurOpt::WhichBlock::isD); // Hpp
+        schur_opt.read_sparse(Dschur_fname, schur_opt, SchurOpt::WhichBlock::isDschur); // Hpp
 
     }
 
