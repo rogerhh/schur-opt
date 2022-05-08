@@ -191,11 +191,8 @@ void SchurOpt::compute_schur(/* parameters */) {
 
     cout << "Number of Eigen Threads " << num_eigen_threads << endl;
 
-
-
     // We are going to assume all the matrices are set in a nice way
     std::chrono::steady_clock::time_point t_schur_start = std::chrono::steady_clock::now();
-
 
     assert(P % block_size == 0);
     assert(L % block_size == 0);
@@ -229,10 +226,10 @@ void SchurOpt::compute_schur(/* parameters */) {
             A_inv_B_used[A_inv_B_ij_idx] = true; 
 
             vector<double>& A_inv_B_ij = A_inv_B[A_inv_B_ij_idx];
-            Eigen::Map<Matrix<double, 3, 3, RowMajor>> A_inv_B_m(A_inv_B_ij.data());
+            Eigen::Map<Matrix<double, 3, 3, RowMajor>> A_inv_B_ij_m(A_inv_B_ij.data());
 
             // Matrix<double, 3, 3, RowMajor> A_inv_B_m = Ainv_m * Bij_m;
-            A_inv_B_m = Ainv_m * Bij_m;
+            A_inv_B_ij_m = Ainv_m * Bij_m;
             
             // for (int i = 0; i < 9; i++) {
             //     cout << A_inv_B_ij[i] << " ";
@@ -266,13 +263,13 @@ void SchurOpt::compute_schur(/* parameters */) {
             // initialize Dschur entry as corresponding data in D
             int ij_idx = pair_to_idx(i, j, num_P_blocks, num_P_blocks);
             Dschur_used[ij_idx] = D_used[ij_idx];
-            if (Dschur_used[ij_idx]) {
-                Dschur[ij_idx] = Dschur[ij_idx];
+            if (D_used[ij_idx]) {
+                Dschur[ij_idx] = D[ij_idx]; // Dschur = D - CA-1B
                 // memcpy(&Dschur[ij_idx], &Dschur[ij_idx], block_squared*sizeof(double));
             }
 
-            vector<double>& Dschur_ik = Dschur[ij_idx];
-            Eigen::Map<Matrix<double, 3, 3, RowMajor>> Dschur_ik_m(Dschur_ik.data());
+            vector<double>& Dschur_ij = Dschur[ij_idx];
+            Eigen::Map<Matrix<double, 3, 3, RowMajor>> Dschur_ij_m(Dschur_ij.data());
 
             // add inner product result, iterate over k, accumulate C_ik * A_inv_B_kj
             for (int k = 0; k < num_L_blocks; k++) {
@@ -285,6 +282,7 @@ void SchurOpt::compute_schur(/* parameters */) {
                 if (!B_used[ik_idx] || !A_inv_B_used[kj_idx]) {
                     continue;
                 }
+                Dschur_used[ij_idx] = true;
 
                 // Get the C_ik block
                 vector<double>& C_ik = B[ik_idx];
@@ -294,7 +292,8 @@ void SchurOpt::compute_schur(/* parameters */) {
                 vector<double>& A_inv_B_kj = A_inv_B[kj_idx];
                 Eigen::Map<Matrix<double, 3, 3, RowMajor>> A_inv_B_kj_m(A_inv_B_kj.data());
 
-                Dschur_ik_m = Dschur_ik_m - C_ik_m * A_inv_B_kj_m;
+                // need to transpose C_ik_m as data is stored in B originally
+                Dschur_ij_m = Dschur_ij_m - C_ik_m.transpose() * A_inv_B_kj_m;
             }
         }
     }
@@ -336,10 +335,16 @@ void SchurOpt::verify_correctness(/* parameters */) {
         // if (!Dschur_used[block_idx]) {
         //     continue; // skip as it is sparse
         // }
+        cout << "DSchur used" << Dschur_used[block_idx] << " " << Dschur_ref_used[block_idx]  << endl;
+
         for (int val_idx = 0; val_idx < block_squared; val_idx++) {
+            // if (block_idx < 10) {
+            cout << Dschur[block_idx][val_idx] << " " << Dschur_ref[block_idx][val_idx] << endl;
+            // } 
             diff = Dschur_ref[block_idx][val_idx] - Dschur[block_idx][val_idx];
             se += diff*diff;
         }
+        cout << " ===== " << block_idx << endl;
     }
     double mse = se / (double) (P*P);
     cout << "MSE: " << mse << endl;
