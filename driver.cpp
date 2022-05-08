@@ -4,7 +4,7 @@
 #include <string>
 #include <cassert>
 #include <cmath>
-#include "schur_opt.h"
+#include "schur_opt_simon.h"
 
 using namespace std;
 
@@ -45,11 +45,11 @@ int main(int argc, char** argv) {
         schur_opt.read_sparse(A_fname, schur_opt, SchurOpt::WhichBlock::isA); // Hll
         schur_opt.read_sparse(C_fname, schur_opt, SchurOpt::WhichBlock::isC); // Hpl
         schur_opt.read_sparse(D_fname, schur_opt, SchurOpt::WhichBlock::isD); // Hpp
-
+        schur_opt.read_sparse(Dschur_fname, schur_opt, SchurOpt::WhichBlock::isDschur_ref); // Hschur_ref
     }
 
     schur_opt.compute_schur();
-
+    schur_opt.verify_correctness();
         // TO-DO: add correctness check with regard to the reference Dschur
     // }
     return 0;

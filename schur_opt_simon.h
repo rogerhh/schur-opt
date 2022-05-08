@@ -12,7 +12,7 @@ public:
     : omp_num_threads(omp_num_threads_in)
     {}
 
-    enum WhichBlock { isA, isB, isC, isD };
+    enum WhichBlock { isA, isB, isC, isD, isDschur_ref };
 
     void from_g2o(/* parameters */);
     void to_g2o(/* parameters */);

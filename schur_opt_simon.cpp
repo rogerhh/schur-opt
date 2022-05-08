@@ -150,7 +150,33 @@ void SchurOpt::read_sparse(const string& fname, SchurOpt& schur_opt, WhichBlock 
             D[block_idx][idx] = val;
             D_used[block_idx] = true; // this bool is true as long as some entry in the block is filled
         }
-    } 
+    } else if (which_block == WhichBlock::isDschur_ref){
+        int num_row_blocks = num_rows / block_size;
+        int num_col_blocks = num_cols / block_size;
+
+        Dschur_ref = vector<vector<double>>(num_row_blocks * num_col_blocks, vector<double>(block_squared, 0));
+        Dschur_ref_used = vector<bool>(num_row_blocks * num_col_blocks, false);
+        
+        while(fin >> row >> col >> val) {
+            row--; // decrease index by 1 as we are zero indexed
+            col--;
+
+            assert(row < num_rows);
+            assert(col < num_cols);
+
+            int row_block = row / block_size;
+            int col_block = col / block_size;
+
+            // row major storage
+            int block_idx = pair_to_idx(row_block, col_block, num_row_blocks, num_col_blocks);
+            int i_offset = row % block_size;
+            int j_offset = col % block_size;
+            int idx = pair_to_idx(i_offset, j_offset, block_size, block_size);
+
+            Dschur_ref[block_idx][idx] = val;
+            Dschur_ref_used[block_idx] = true; // this bool is true as long as some entry in the block is filled
+        }
+    }
 }
 
 /**
@@ -224,8 +250,55 @@ void SchurOpt::compute_schur(/* parameters */) {
     }
     cout << count << " out of " << A_inv_B_used.size() << " blocks of A_inv_B is sparse" << endl;
 
-    // 2. Calculate C * A_inv_B
+    // 2. Calculate C (PxL) * A_inv_B (LxP) -> C A_inv_B (PxP)
     // TO DO
+    // Approach 1: convert C and A_inv_B into an Eigen matrix
+
+
+    Dschur = vector<vector<double>>(num_P_blocks * num_P_blocks, vector<double>(block_squared, 0)); 
+    Dschur_used = vector<bool>(num_P_blocks * num_P_blocks, false);
+
+    // Apporach 2: do operation directly on existing data structure
+    // this is naive but i just want to get something working, we can optimize laterss
+    #pragma omp parallel for
+    for (int i = 0; i < num_P_blocks; i++) {
+        for (int j = 0; j < num_P_blocks; j++) {
+            // initialize Dschur entry as corresponding data in D
+            int ij_idx = pair_to_idx(i, j, num_P_blocks, num_P_blocks);
+            Dschur_used[ij_idx] = D_used[ij_idx];
+            if (Dschur_used[ij_idx]) {
+                Dschur[ij_idx] = Dschur[ij_idx];
+                // memcpy(&Dschur[ij_idx], &Dschur[ij_idx], block_squared*sizeof(double));
+            }
+
+            vector<double>& Dschur_ik = Dschur[ij_idx];
+            Eigen::Map<Matrix<double, 3, 3, RowMajor>> Dschur_ik_m(Dschur_ik.data());
+
+            // add inner product result, iterate over k, accumulate C_ik * A_inv_B_kj
+            for (int k = 0; k < num_L_blocks; k++) {
+
+                // C_ik -> B_ki as C and B are tranpose
+                int ik_idx = pair_to_idx(k, i, num_L_blocks, num_P_blocks);
+                int kj_idx = pair_to_idx(k, j, num_L_blocks, num_P_blocks);
+
+                // skip if either entry is sparse 
+                if (!B_used[ik_idx] || !A_inv_B_used[kj_idx]) {
+                    continue;
+                }
+
+                // Get the C_ik block
+                vector<double>& C_ik = B[ik_idx];
+                Eigen::Map<Matrix<double, 3, 3, RowMajor>> C_ik_m(C_ik.data());
+
+                // Get th A_inv_B_kj block
+                vector<double>& A_inv_B_kj = A_inv_B[kj_idx];
+                Eigen::Map<Matrix<double, 3, 3, RowMajor>> A_inv_B_kj_m(A_inv_B_kj.data());
+
+                Dschur_ik_m = Dschur_ik_m - C_ik_m * A_inv_B_kj_m;
+            }
+        }
+    }
+
 
     // 3. Calculate Dschur = D - C * A_inv_B
     // TO DO
@@ -238,20 +311,36 @@ void SchurOpt::compute_schur(/* parameters */) {
 
 
 /**
- * Dschur - 
- * Dschur_ref 
+ * Dschur - Schur matrix the solver calculated
+ * Dschur_ref - Schur matrix the G2O block solver outputted
+ * Compare dimension, sparisty, and calculate the MSE. 
  */
 void SchurOpt::verify_correctness(/* parameters */) {
-    // test only functionality for now
-    Dschur_ref = Dschur;
-    Dschur_ref_used = Dschur_used;
+
+    // If you set this, MSE will be 0
+    // Dschur_ref = Dschur;
+    // Dschur_ref_used = Dschur_used;
+
+    // verify Dschur has the right size
+    assert(Dschur.size() * block_squared == P * P);
     
     // actual code
-    assert(Dschur.size() == Dschur_ref.size());
+    assert(Dschur.size() == Dschur_ref.size()); // comparing number of 3x3 blocks
     assert(Dschur_used.size() == Dschur_ref_used.size());
 
-    
-
-    cout << "Correctness check not implemented yet" << endl;
-
-}   
+    // cout << "Dschur size=" << Dschur.size() << endl;
+    double se = 0.0;  // squared error
+    double diff;
+    for (int block_idx = 0; block_idx < Dschur.size(); block_idx++) {
+        // assert(Dschur_used[block_idx] == Dschur_ref_used[block_idx]); // agree on block sparsity
+        // if (!Dschur_used[block_idx]) {
+        //     continue; // skip as it is sparse
+        // }
+        for (int val_idx = 0; val_idx < block_squared; val_idx++) {
+            diff = Dschur_ref[block_idx][val_idx] - Dschur[block_idx][val_idx];
+            se += diff*diff;
+        }
+    }
+    double mse = se / (double) (P*P);
+    cout << "MSE: " << mse << endl;
+}
