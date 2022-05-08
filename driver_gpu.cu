@@ -19,27 +19,32 @@ int main(int argc, char** argv) {
         }
     }
 
-    SchurOpt schur_opt();
+    SchurOpt schur_opt;
 
-    string list_fname = "/app/schur_opt/filelist.csv";
+    string list_fname = "../data/filelist.csv";
     ifstream list_fin(list_fname);
     if(!list_fin.is_open()) {
         cerr << "Error opening file: " << list_fname << endl;
+        exit(1);
     }
 
-    string A_fname, B_fname, D_fname, b_fname, Dschur_fname, bschur_fname;
+    string A_fname, C_fname, D_fname, b_fname, Dschur_fname, bschur_fname;
 
-    while(list_fin >> A_fname >> B_fname >> D_fname >> b_fname >> Dschur_fname >> bschur_fname) {
-        cout << A_fname << ", " << B_fname << ", " << D_fname << ", " << b_fname << ", " 
+    cout << "here0" << endl;
+
+    while(list_fin >> A_fname >> C_fname >> D_fname >> b_fname >> Dschur_fname >> bschur_fname) {
+        cout << A_fname << ", " << C_fname << ", " << D_fname << ", " << b_fname << ", " 
             << Dschur_fname << ", " << bschur_fname << endl;
 
-        // schur_opt.read_sparse(A_fname, SchurOpt::WhichBlock::isA);
-        // schur_opt.read_sparse(B_fname, SchurOpt::WhichBlock::isC);
-        // schur_opt.read_sparse(D_fname, SchurOpt::WhichBlock::isD);
+        schur_opt.read_sparse(A_fname, SchurOpt::WhichBlock::isA);
+        schur_opt.read_sparse(C_fname, SchurOpt::WhichBlock::isC);
+        schur_opt.read_sparse(D_fname, SchurOpt::WhichBlock::isD);
 
     }
 
-    // schur_opt.compute_schur();
+    cout << "here1" << endl;
+
+    schur_opt.compute_schur();
 
     return 0;
 }
