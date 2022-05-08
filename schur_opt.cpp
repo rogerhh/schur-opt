@@ -115,8 +115,6 @@ void SchurOpt::read_sparse(const string& fname, SchurOpt& schur_opt, WhichBlock 
         int num_row_blocks = num_rows / block_size;
         int num_col_blocks = num_cols / block_size;
 
-        cout << "read D" << num_row_blocks << " " << num_col_blocks << endl;
-
         D = vector<vector<double>>(num_row_blocks * num_col_blocks, vector<double>(block_squared, 0));
         D_used = vector<bool>(num_row_blocks * num_col_blocks, false);
         
@@ -144,10 +142,14 @@ void SchurOpt::read_sparse(const string& fname, SchurOpt& schur_opt, WhichBlock 
 struct DPair {
     vector<vector<double>>* Dschur_ptr;
     vector<bool>* Dschur_used_ptr;
+    // vector<vector<double>> Dschur_ptr;
+    // vector<bool> Dschur_used_ptr;
 
     DPair(vector<vector<double>>& Dschur_in, vector<bool>& Dschur_used_in) {
         Dschur_ptr = &Dschur_in;
         Dschur_used_ptr = &Dschur_used_in;
+        // Dschur_ptr = Dschur_in;
+        // Dschur_used_ptr = Dschur_used_in;
     }
 };
 
@@ -157,10 +159,21 @@ void matrix_sub(DPair omp_out,
     vector<bool>& Dschur_used = *(omp_out.Dschur_used_ptr);
     vector<vector<double>>& Dschur_local = *(omp_in.Dschur_ptr);
     vector<bool>& Dschur_used_local = *(omp_in.Dschur_used_ptr);
+    // vector<vector<double>>& Dschur = (omp_out.Dschur_ptr);
+    // vector<bool>& Dschur_used = (omp_out.Dschur_used_ptr);
+    // vector<vector<double>>& Dschur_local = (omp_in.Dschur_ptr);
+    // vector<bool>& Dschur_used_local = (omp_in.Dschur_used_ptr);
 
     assert(Dschur.size() == Dschur_local.size());
     assert(Dschur_used.size() == Dschur_used_local.size());
     assert(Dschur.size() == Dschur_used.size());
+
+    // reduction on self
+    if(omp_in.Dschur_ptr == omp_out.Dschur_ptr) {
+        return;
+    }
+
+    // cout << "thread id = " << omp_get_thread_num() << " before loop " << Dschur[0][0] << " " << Dschur_local[0][0] << " " << &Dschur << " " << &Dschur_local << endl;
 
     for(int i = 0; i < Dschur_local.size(); i++) {
         if(!Dschur_used_local[i]) {
@@ -185,6 +198,8 @@ void SchurOpt::compute_schur(/* parameters */) {
     
     omp_set_num_threads(omp_num_threads);
 
+    Dschur = D;
+    Dschur_used = D_used;
     DPair dpair(Dschur, Dschur_used);
 
     #pragma omp parallel default(shared) 
@@ -244,15 +259,18 @@ void SchurOpt::compute_schur(/* parameters */) {
         }
 
 
-        #pragma omp for private(Dschur_local, Dschur_used_local) reduction(matrix_sub : dpair)
+        DPair dpair_local(Dschur_local, Dschur_used_local);
+        #pragma omp parallel for reduction(matrix_sub : dpair)
         for(int i = 0; i < omp_num_threads; i++) {
-            matrix_sub(dpair, DPair(Dschur_local, Dschur_used_local));
+            matrix_sub(dpair, dpair_local);
         }
 
     }
 
     chrono::steady_clock::time_point t_schur_end = chrono::steady_clock::now();
     double t_schur = chrono::duration_cast<chrono::duration<double, milli>>(t_schur_end - t_schur_start).count();
-    cout << "num_cores= " << omp_num_threads << " t_schur = " << t_schur << endl;
+    // cout << "num_cores= " << omp_num_threads << " t_schur = " << t_schur << endl;
+    // cout << "Dschur[0, 0] = " << Dschur[0][0] << endl;
+    // cout << "dschur addr at end = " << &Dschur << endl;
 
 }
