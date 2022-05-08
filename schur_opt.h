@@ -12,7 +12,7 @@ public:
     : omp_num_threads(omp_num_threads_in)
     {}
 
-    enum WhichBlock { isA, isB, isC, isD, isDschur };
+    enum WhichBlock { isA, isB, isC, isD, isDschur_ref };
 
     void from_g2o(/* parameters */);
     void to_g2o(/* parameters */);
@@ -20,6 +20,8 @@ public:
     void compute_schur(/* parameters */);
     void read_sparse(const std::string& fname, SchurOpt& schur_opt, WhichBlock which_block);
 
+    void verify_correctness(/* parameters */);
+    
 private:
 
     const int block_size = 3;
@@ -48,7 +50,10 @@ private:
     std::vector<bool> Dschur_used;
     std::vector<double> bschur;
 
-    std::vector<std::vector<double>> Dschur_correct;
+    // for verifying result
+    std::vector<std::vector<double>> Dschur_ref;
+    std::vector<bool> Dschur_ref_used;
+    std::vector<double> bschur_ref;
 };
 
 #endif

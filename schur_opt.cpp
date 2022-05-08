@@ -147,11 +147,12 @@ void SchurOpt::read_sparse(const string& fname, SchurOpt& schur_opt, WhichBlock 
             D[block_idx][idx] = val;
             D_used[block_idx] = true; // this bool is true as long as some entry in the block is filled
         }
-    } else if (which_block == WhichBlock::isDschur) {
+    }  else if (which_block == WhichBlock::isDschur_ref){
         int num_row_blocks = num_rows / block_size;
         int num_col_blocks = num_cols / block_size;
 
-        Dschur_correct = vector<vector<double>>(num_row_blocks * num_col_blocks, vector<double>(block_squared, 0));
+        Dschur_ref = vector<vector<double>>(num_row_blocks * num_col_blocks, vector<double>(block_squared, 0));
+        Dschur_ref_used = vector<bool>(num_row_blocks * num_col_blocks, false);
         
         while(fin >> row >> col >> val) {
             row--; // decrease index by 1 as we are zero indexed
@@ -169,7 +170,8 @@ void SchurOpt::read_sparse(const string& fname, SchurOpt& schur_opt, WhichBlock 
             int j_offset = col % block_size;
             int idx = pair_to_idx(i_offset, j_offset, block_size, block_size);
 
-            Dschur_correct[block_idx][idx] = val;
+            Dschur_ref[block_idx][idx] = val;
+            Dschur_ref_used[block_idx] = true; // this bool is true as long as some entry in the block is filled
         }
     }
 }
@@ -327,21 +329,41 @@ void SchurOpt::compute_schur(/* parameters */) {
     // cout << "num_cores= " << omp_num_threads << " t_schur = " << t_schur << endl;
     // cout << "Dschur[0, 0] = " << Dschur[0][0] << endl;
     // cout << "dschur addr at end = " << &Dschur << endl;
-    cout << "num_threads= " << omp_num_threads << " t_schur= " << t_schur << endl;
+    cout << "num_threads= " << omp_num_threads << " t_schur= " << t_schur << " P= " << P << " L= " << L << endl;
 
-    for(int c = 0; c < 150; c++) {
-        for(int r = 0; r < 150; r++) {
-            int row_block = r / block_size;
-            int col_block = c / block_size;
-            int x_offset = r % block_size;
-            int y_offset = c % block_size;
+}
 
-            int block_idx = pair_to_idx(row_block, col_block, P / block_size, P / block_size);
-            int idx = pair_to_idx(x_offset, y_offset, block_size, block_size);
+/**
+ * Dschur - Schur matrix the solver calculated
+ * Dschur_ref - Schur matrix the G2O block solver outputted
+ * Compare dimension, sparisty, and calculate the MSE. 
+ */
+void SchurOpt::verify_correctness(/* parameters */) {
 
-            cout << r << " " << c << " " << block_idx << " " << idx << " " << Dschur[block_idx][idx] << endl;
+    // If you set this, MSE will be 0
+    // Dschur_ref = Dschur;
+    // Dschur_ref_used = Dschur_used;
+
+    // verify Dschur has the right size
+    assert(Dschur.size() * block_squared == P * P);
+    
+    // actual code
+    assert(Dschur.size() == Dschur_ref.size()); // comparing number of 3x3 blocks
+    assert(Dschur_used.size() == Dschur_ref_used.size());
+
+    // cout << "Dschur size=" << Dschur.size() << endl;
+    double se = 0.0;  // squared error
+    double diff;
+    for (int block_idx = 0; block_idx < Dschur.size(); block_idx++) {
+        // assert(Dschur_used[block_idx] == Dschur_ref_used[block_idx]); // agree on block sparsity
+        // if (!Dschur_used[block_idx]) {
+        //     continue; // skip as it is sparse
+        // }
+        for (int val_idx = 0; val_idx < block_squared; val_idx++) {
+            diff = Dschur_ref[block_idx][val_idx] - Dschur[block_idx][val_idx];
+            se += diff*diff;
         }
     }
-    
-
+    double mse = se / (double) (P*P);
+    cout << "MSE: " << mse << endl;
 }
