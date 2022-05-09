@@ -4,3 +4,4 @@ project(schur-opt)
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
 add_executable(driver.exe driver.cpp schur_opt.h schur_opt.cpp)
+add_executable(driver_simon.exe driver.cpp schur_opt.h schur_opt_simon.cpp)

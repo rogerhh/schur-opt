@@ -1,6 +1,6 @@
 #ifndef SCHUR_OPT_H
 #define SCHUR_OPT_H
-
+    
 #include <vector>
 #include <string>
 
@@ -37,6 +37,10 @@ private:
     // B stored in 2D row major, C is B^T
     std::vector<std::vector<double>> B;  
     std::vector<bool> B_used;  
+
+    // A^-1B is LxP, stored as block
+    std::vector<std::vector<double>> A_inv_B;  
+    std::vector<bool> A_inv_B_used;  
 
     // D stored in 2D row major
     std::vector<std::vector<double>> D;
