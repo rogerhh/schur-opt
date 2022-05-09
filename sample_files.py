@@ -15,7 +15,7 @@ random.seed(1)
 
 num_samples = 1
 
-data_path="../data/schur_dataset"
+data_path="../data/schur_dataset/"
 dataset_files = [f for f in listdir(data_path) if isfile(join(data_path, f))]
 
 seqeunce_set = set()
@@ -27,11 +27,12 @@ for f in dataset_files:
 sampled_set = random.sample(seqeunce_set, num_samples)
 
 # export CSV in these format /app/data/Hll.oct /app/data/Hpl.oct Hpp.oct B.oct Hschur.oct Bschur.oct
-matrix_names = ['Hll.oct', 'Hpl.oct', 'Hpp.oct', 'b.out', 'Hschur.oct', 'bschur.out']
+matrix_names = [['Hll', '.oct'], ['Hpl', '.oct'], ['Hpp', '.oct'], ['b', '.out'], ['Hschur', '.oct'], ['bschur', '.out']]
+
 
 with open('filelist_sample.csv', 'w', newline='') as csvfile:
     matrix_writer = csv.writer(csvfile, delimiter=' ',
                             quotechar='|', quoting=csv.QUOTE_MINIMAL)
     for sample_id in sampled_set:
-        matrix_writer.writerow([data_path + '/' + sample_id + '_' + matrix_name for matrix_name in matrix_names])
+        matrix_writer.writerow([data_path + matrix_name[0] + '_' + sample_id +  matrix_name[1] for matrix_name in matrix_names])
 

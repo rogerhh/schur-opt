@@ -2,6 +2,7 @@
 #include <iostream>
 #include <getopt.h>
 #include <string>
+#include <regex>
 #include <cassert>
 #include <cmath>
 #include "schur_opt.h"
@@ -30,7 +31,7 @@ int main(int argc, char** argv) {
     // initialize solver based on num_threads set
     SchurOpt schur_opt(omp_num_threads);
 
-    string list_fname = "/app/data/schur_dataset/filelist.csv";
+    string list_fname = "/app/schur_opt/filelist.csv";
     ifstream list_fin(list_fname);
     if(!list_fin.is_open()) {
         cerr << "Error opening file: " << list_fname << endl;
@@ -40,19 +41,26 @@ int main(int argc, char** argv) {
     string A_fname, C_fname, D_fname, b_fname, Dschur_fname, bschur_fname;
 
     while(list_fin >> A_fname >> C_fname >> D_fname >> b_fname >> Dschur_fname >> bschur_fname) {
-        cout << A_fname << ", " << C_fname << ", " << D_fname << ", " << b_fname << ", " 
-                << Dschur_fname << ", " << bschur_fname << endl;
+
+        regex regexp("[0-9]+_[0-9]+_[0-9]+"); 
+        smatch m; 
+        regex_search(A_fname, m, regexp); 
+
+        for (auto x : m) 
+            cout << "Loaded dataset " << x << endl; 
+
+        // cout << A_fname << ", " << C_fname << ", " << D_fname << ", " << b_fname << ", " 
+        //         << Dschur_fname << ", " << bschur_fname << endl;
 
         schur_opt.read_sparse(A_fname, schur_opt, SchurOpt::WhichBlock::isA); // Hll
         schur_opt.read_sparse(C_fname, schur_opt, SchurOpt::WhichBlock::isC); // Hpl
         schur_opt.read_sparse(D_fname, schur_opt, SchurOpt::WhichBlock::isD); // Hpp
-
+        // reference
         schur_opt.read_sparse(Dschur_fname, schur_opt, SchurOpt::WhichBlock::isDschur_ref); // Hschur_ref
 	
         schur_opt.compute_schur();
         schur_opt.verify_correctness();
 
-        exit(1);
     }
 
     return 0;
