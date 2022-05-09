@@ -40,11 +40,15 @@ int main(int argc, char** argv) {
         schur_opt.read_sparse(C_fname, SchurOpt::WhichBlock::isC);
         schur_opt.read_sparse(D_fname, SchurOpt::WhichBlock::isD);
 
+        schur_opt.read_sparse(Dschur_fname, SchurOpt::WhichBlock::isDschur_ref); // Hschur_ref
     }
 
     cout << "here1" << endl;
 
     schur_opt.compute_schur();
+    cout << "here2" << endl;
+    schur_opt.verify_correctness();
+    cout << "here3" << endl;
 
     return 0;
 }

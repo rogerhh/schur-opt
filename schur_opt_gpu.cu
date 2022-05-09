@@ -57,6 +57,10 @@ SchurOpt::~SchurOpt() {
         cudaFree(CAinv_gpu_batch);
         CAinv_gpu_batch = nullptr;
     }
+    if(D_gpu) {
+        cudaFree(D_gpu);
+        D_gpu = nullptr;
+    }
 }
 
 // For CUBLAS, this needs to be column major
@@ -270,8 +274,7 @@ void SchurOpt::read_sparse(const string& fname, WhichBlock which_block) {
         P = num_rows;
         // cout << "read D" << num_row_blocks << " " << num_col_blocks << endl;
 
-        D = vector<vector<double>>(num_row_blocks * num_col_blocks, vector<double>(block_squared, 0));
-        D_used = vector<bool>(num_row_blocks * num_col_blocks, false);
+        D = vector<double>(num_row_blocks * num_col_blocks * block_squared, 0);
         
         while(fin >> row >> col >> val) {
             row--;  // index by 1
@@ -280,18 +283,54 @@ void SchurOpt::read_sparse(const string& fname, WhichBlock which_block) {
             assert(row < num_rows);
             assert(col < num_cols);
 
-            int row_block = row / block_size;
-            int col_block = col / block_size;
+            int idx = pair_to_idx_col(row, col, num_rows, num_cols);
+            D[idx] = val;
+        }
+    } else if (which_block == WhichBlock::isDschur_ref){
+        int num_row_blocks = num_rows / block_size;
+        int num_col_blocks = num_cols / block_size;
 
-            int block_idx = pair_to_idx_col(row_block, col_block, num_row_blocks, num_col_blocks);
-            int i_offset = row % block_size;
-            int j_offset = col % block_size;
-            int idx = pair_to_idx_col(i_offset, j_offset, block_size, block_size);
+        Dschur_ref = vector<double>(num_row_blocks * num_col_blocks * block_squared, 0);
+        
+        while(fin >> row >> col >> val) {
+            row--; // decrease index by 1 as we are zero indexed
+            col--;
 
-            D[block_idx][idx] = val;
-            D_used[block_idx] = true;
+            assert(row < num_rows);
+            assert(col < num_cols);
+
+            int idx = pair_to_idx_col(row, col, num_rows, num_cols);
+
+            Dschur_ref[idx] = val;
         }
     }
+}
+
+/**
+ * Dschur - Schur matrix the solver calculated
+ * Dschur_ref - Schur matrix the G2O block solver outputted
+ * Compare dimension, sparisty, and calculate the MSE. 
+ */
+void SchurOpt::verify_correctness(/* parameters */) {
+
+    // If you set this, MSE will be 0
+    // Dschur_ref = Dschur;
+    // Dschur_ref_used = Dschur_used;
+
+    // verify Dschur has the right size
+    assert(Dschur.size() == P * P);
+    
+    // actual code
+    assert(Dschur.size() == Dschur_ref.size()); // comparing number of 3x3 blocks
+
+    // cout << "Dschur size=" << Dschur.size() << endl;
+    double se = 0.0;  // squared error
+    for(int i = 0; i < Dschur.size(); i++) {
+        double diff = Dschur[i] - Dschur_ref[i];
+        se += diff * diff;
+    }
+    double mse = se / (double) (P*P);
+    cout << "MSE: " << mse << endl;
 }
 
 void SchurOpt::compute_Ainv() {
@@ -396,6 +435,7 @@ void SchurOpt::compute_schur(/* parameters */) {
     cublasHandle_t handle;
     cublasOperation_t transa = CUBLAS_OP_N;
     cublasOperation_t transb = CUBLAS_OP_N;
+    cublasOperation_t transt = CUBLAS_OP_T;
 
     stat = cublasCreate(&handle);
     if(stat != CUBLAS_STATUS_SUCCESS) {
@@ -461,16 +501,50 @@ void SchurOpt::compute_schur(/* parameters */) {
         print_error_and_exit("CUBLAS batched dgemm failed");
     }
 
-    vector<double> CAinv(C.size(), 0);
-    stat = cublasGetVector(C.size(), sizeof(double), CAinv_gpu, 1, CAinv.data(), 1);   
-    if(stat != CUBLAS_STATUS_SUCCESS) {
-        print_error_and_exit("Error getting data: CAinv");
+    // vector<double> CAinv(C.size(), 0);
+    // stat = cublasGetVector(C.size(), sizeof(double), CAinv_gpu, 1, CAinv.data(), 1);   
+    // if(stat != CUBLAS_STATUS_SUCCESS) {
+    //     print_error_and_exit("Error getting data: CAinv");
+    // }
+
+    // cout << "CAinv: " << endl;
+    // for(int i = 0; i < 100; i++) {
+    //     cout << CAinv[i] << endl;
+    // }
+
+    cudaStat = cudaMalloc((void**) &D_gpu, D.size() * sizeof(double*));
+    if(cudaStat != cudaSuccess) {
+        print_error_and_exit("Error: Device memory allocation failure for D_gpu");
     }
 
-    cout << "CAinv: " << endl;
-    for(int i = 0; i < 100; i++) {
-        cout << CAinv[i] << endl;
+    stat = cublasSetVector(D.size(), sizeof(double), D.data(), 1, D_gpu, 1);
+    if(stat != CUBLAS_STATUS_SUCCESS) {
+        print_error_and_exit("CUBLAS vector copy failed: D_gpu");
     }
+
+    alpha = -1; // D - CAinvB
+    beta = 1;
+
+    stat = cublasDgemm(handle,
+                       transa,
+                       transt,
+                       P, P, L,
+                       &alpha,
+                       CAinv_gpu, P,
+                       C_gpu, P,
+                       &beta,
+                       D_gpu, P);
+
+    Dschur = vector<double>(D.size(), 0);
+    stat = cublasGetVector(Dschur.size(), sizeof(double), D_gpu, 1, Dschur.data(), 1);   
+    if(stat != CUBLAS_STATUS_SUCCESS) {
+        print_error_and_exit("Error getting data: Dschur");
+    }
+
+    // cout << "Dschur: " << endl;
+    // for(int i = 0; i < 200; i++) {
+    //     cout << Dschur[i] << endl;
+    // }
 
     cublasDestroy(handle);
 }

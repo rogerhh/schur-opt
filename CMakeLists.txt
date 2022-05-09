@@ -8,7 +8,7 @@ project(schur-opt)
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
 add_executable(driver.exe driver.cpp schur_opt.h schur_opt.cpp)
-add_executable(driver_debug.exe driver_gpu.cu schur_opt_gpu.h schur_opt_debug.cpp)
+# add_executable(driver_debug.exe driver_gpu.cu schur_opt_gpu.h schur_opt_debug.cpp)
 
 # Packaging system
 set(CPACK_GENERATOR TGZ)
