@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
     // OpenMP scaling experiment 
     // for(int num_cores = 0; num_cores < 32; num_cores += 2) {
     int opt = -1;
-    int omp_num_threads = 1; // default single threaded
+    int omp_num_threads = 4; // default single threaded
     
     while((opt = getopt(argc, argv, "n:")) != -1) {
         switch(opt) {
@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     // initialize solver based on num_threads set
     SchurOpt schur_opt(omp_num_threads);
 
-    string list_fname = "../data/filelist.csv";
+    string list_fname = "/app/data/schur_dataset/filelist.csv";
     ifstream list_fin(list_fname);
     if(!list_fin.is_open()) {
         cerr << "Error opening file: " << list_fname << endl;
@@ -48,12 +48,12 @@ int main(int argc, char** argv) {
         schur_opt.read_sparse(D_fname, schur_opt, SchurOpt::WhichBlock::isD); // Hpp
 
         schur_opt.read_sparse(Dschur_fname, schur_opt, SchurOpt::WhichBlock::isDschur_ref); // Hschur_ref
+	
+        schur_opt.compute_schur();
+        schur_opt.verify_correctness();
+
+        exit(1);
     }
 
-    schur_opt.compute_schur();
-    schur_opt.verify_correctness();
-
-        // TO-DO: add correctness check with regard to the reference Dschur
-    // }
     return 0;
 }

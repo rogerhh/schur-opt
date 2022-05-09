@@ -38,6 +38,7 @@ void SchurOpt::read_sparse(const string& fname, SchurOpt& schur_opt, WhichBlock 
 
     if(!fin.is_open()) {
         cerr << "Error opening: " << fname << endl;
+        exit(1);
     }
 
     string line;
@@ -181,14 +182,22 @@ void SchurOpt::read_sparse(const string& fname, SchurOpt& schur_opt, WhichBlock 
  * contains pointer to stored data as well as bool flag
  */
 struct DPair {
-    vector<vector<double>>* Dschur_ptr;
-    vector<bool>* Dschur_used_ptr;
-    // vector<vector<double>> Dschur_ptr;
-    // vector<bool> Dschur_used_ptr;
+    // vector<vector<double>>* Dschur_ptr;
+    // vector<bool>* Dschur_used_ptr;
+    vector<vector<double>> Dschur_ptr;
+    vector<bool> Dschur_used_ptr;
+
+    DPair(int num_blocks, int block_squared) {
+        // Dschur_ptr = nullptr;
+        // Dschur_used_ptr = nullptr;
+        Dschur_ptr = vector<vector<double>>(num_blocks, vector<double>(block_squared, 0));
+        Dschur_used_ptr = vector<bool>(num_blocks, false);
+
+    }
 
     DPair(vector<vector<double>>& Dschur_in, vector<bool>& Dschur_used_in) {
-        Dschur_ptr = &Dschur_in;
-        Dschur_used_ptr = &Dschur_used_in;
+        Dschur_ptr = Dschur_in;
+        Dschur_used_ptr = Dschur_used_in;
         // Dschur_ptr = Dschur_in;
         // Dschur_used_ptr = Dschur_used_in;
     }
@@ -197,27 +206,28 @@ struct DPair {
 /**
  * Reduction function on DSchur (PxP) matrixes
  */
-void matrix_sub(DPair omp_out, 
-                const DPair omp_in) {
-    vector<vector<double>>& Dschur = *(omp_out.Dschur_ptr);
-    vector<bool>& Dschur_used = *(omp_out.Dschur_used_ptr);
-    vector<vector<double>>& Dschur_local = *(omp_in.Dschur_ptr);
-    vector<bool>& Dschur_used_local = *(omp_in.Dschur_used_ptr);
-    // vector<vector<double>>& Dschur = (omp_out.Dschur_ptr);
-    // vector<bool>& Dschur_used = (omp_out.Dschur_used_ptr);
-    // vector<vector<double>>& Dschur_local = (omp_in.Dschur_ptr);
-    // vector<bool>& Dschur_used_local = (omp_in.Dschur_used_ptr);
+void matrix_add(DPair& omp_out, 
+                DPair& omp_in) {
+    // vector<vector<double>>& Dschur = *(omp_out.Dschur_ptr);
+    // vector<bool>& Dschur_used = *(omp_out.Dschur_used_ptr);
+    // vector<vector<double>>& Dschur_local = *(omp_in.Dschur_ptr);
+    // vector<bool>& Dschur_used_local = *(omp_in.Dschur_used_ptr);
+    vector<vector<double>>& Dschur = (omp_out.Dschur_ptr);
+    vector<bool>& Dschur_used = (omp_out.Dschur_used_ptr);
+    vector<vector<double>>& Dschur_local = (omp_in.Dschur_ptr);
+    vector<bool>& Dschur_used_local = (omp_in.Dschur_used_ptr);
 
+    // cout << "size = " << Dschur.size() << " " << Dschur_local.size() << endl;
     assert(Dschur.size() == Dschur_local.size());
     assert(Dschur_used.size() == Dschur_used_local.size());
     assert(Dschur.size() == Dschur_used.size());
 
     // reduction on self
     if(omp_in.Dschur_ptr == omp_out.Dschur_ptr) {
-        return;
+        // return;
     }
 
-    // cout << "thread id = " << omp_get_thread_num() << " before loop " << Dschur[0][0] << " " << Dschur_local[0][0] << " " << &Dschur << " " << &Dschur_local << endl;
+    // cout << "thread id = " << omp_get_thread_num() << " before loop " << Dschur[0][0] << " " << Dschur_local[0][0] << " " << endl;
 
     for(int i = 0; i < Dschur_local.size(); i++) {
         if(!Dschur_used_local[i]) {
@@ -227,14 +237,22 @@ void matrix_sub(DPair omp_out,
         Dschur_used[i] = true;
         assert(Dschur[i].size() == Dschur_local[i].size());
         for(int j = 0; j < Dschur_local[i].size(); j++) {
-            Dschur[i][j] -= Dschur_local[i][j];
+            Dschur[i][j] += Dschur_local[i][j];
         }
     }
+
+    // cout << "thread id = " << omp_get_thread_num() << " before loop " << omp_out.Dschur_ptr[0][0] << " " << Dschur_local[0][0] << " " << endl;
+
     return;
 }
 
+DPair dpair_init() {
+    cout << "init" << endl;
+    return DPair(4, 9);
+}
+
 // Declaration of OpenMP reduction on DSchur
-#pragma omp declare reduction(matrix_sub : DPair : matrix_sub(omp_out, omp_in)) initializer(omp_priv=omp_orig)
+#pragma omp declare reduction(matrix_add : DPair : matrix_add(omp_out, omp_in)) initializer(omp_priv=omp_orig)
 
 /**
  * Compute the Schur component S = D-Cinv(A)B
@@ -243,6 +261,11 @@ void matrix_sub(DPair omp_out,
  * each of Ck*inv(Ak)*Bk results in PxP summand which we will reduce in the end
  */
 void SchurOpt::compute_schur(/* parameters */) {
+    assert(P % block_size == 0);
+    assert(L % block_size == 0);
+    int num_P_blocks = P / 3;
+    int num_L_blocks = L / 3;
+
     // We are going to assume all the matrices are set in a nice way
     std::chrono::steady_clock::time_point t_schur_start = std::chrono::steady_clock::now();
     
@@ -251,18 +274,21 @@ void SchurOpt::compute_schur(/* parameters */) {
     Dschur = D;
     Dschur_used = D_used;
     DPair dpair(Dschur, Dschur_used);
+    DPair dpair_init(DPair(num_P_blocks * num_P_blocks, block_squared));
+    vector<DPair> dpair_arr;
+    for(int i = 0; i < omp_num_threads; i++) {
+        // dpair_arr.push_back(DPair(Dschur_local_arr[i], Dschur_used_local_arr[i]));
+        dpair_arr.push_back(DPair(num_P_blocks * num_P_blocks, block_squared));
+    }
 
     #pragma omp parallel default(shared) 
     {
-        assert(P % block_size == 0);
-        assert(L % block_size == 0);
-        int num_P_blocks = P / 3;
-        int num_L_blocks = L / 3;
+        int omp_id = omp_get_thread_num();
         
         // local summand of Ck*inv(Ak)*Bk wich is PxP, stored in blocks (bxb)
-        vector<vector<double>> Dschur_local(num_P_blocks * num_P_blocks, vector<double>(block_squared, 0));        
+        vector<vector<double>>& Dschur_local = (dpair_arr[omp_id].Dschur_ptr);
         assert(Dschur_local.size() == D.size());
-        vector<bool> Dschur_used_local(num_P_blocks * num_P_blocks, false);
+        vector<bool>& Dschur_used_local = (dpair_arr[omp_id].Dschur_used_ptr);
         vector<double> bschur_local;
 
         // parallelize across number of block diagonal matrix in A
@@ -311,18 +337,24 @@ void SchurOpt::compute_schur(/* parameters */) {
                     Dschur_used_local[Djk_idx] = true;
                     Eigen::Map<Matrix<double, 3, 3, RowMajor>> Djk_m(Djk.data());
 
-                    Djk_m += CAinv_m * Bik_m;
+                    // multiply by -1 here, later we just need to do sum reduction
+                    Djk_m -= CAinv_m * Bik_m;
                 }
             }
         }
-
-        DPair dpair_local(Dschur_local, Dschur_used_local);
-        #pragma omp parallel for reduction(matrix_sub : dpair)
-        for(int i = 0; i < omp_num_threads; i++) {
-            matrix_sub(dpair, dpair_local);
-        }
-
+    #pragma omp barrier
     }
+
+    // cout << omp_num_threads << endl;
+
+    #pragma omp parallel for reduction(matrix_add : dpair_init)
+    for(int i = 0; i < omp_num_threads; i++) {
+        // cout << "why" << endl;
+        matrix_add(dpair_init, dpair_arr[i]);
+    }
+    matrix_add(dpair, dpair_init);
+    Dschur = dpair.Dschur_ptr;
+    // cout << "end " << Dschur[0][0] << endl;
 
     chrono::steady_clock::time_point t_schur_end = chrono::steady_clock::now();
     double t_schur = chrono::duration_cast<chrono::duration<double, milli>>(t_schur_end - t_schur_start).count();
