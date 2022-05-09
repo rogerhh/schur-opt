@@ -4,3 +4,6 @@
 data/
 build/
 .vscode/
+
+filelist_sample.csv
+profiling/*.txt

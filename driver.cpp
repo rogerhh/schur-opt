@@ -9,6 +9,8 @@
 
 using namespace std;
 
+const int NUM_TRIALS = 5;
+
 
 int main(int argc, char** argv) {
 
@@ -47,7 +49,7 @@ int main(int argc, char** argv) {
         regex_search(A_fname, m, regexp); 
 
         for (auto x : m) 
-            cout << "Loaded dataset " << x << endl; 
+            cout << "[DATASET] Loaded dataset " << x << endl; 
 
         // cout << A_fname << ", " << C_fname << ", " << D_fname << ", " << b_fname << ", " 
         //         << Dschur_fname << ", " << bschur_fname << endl;
@@ -56,11 +58,20 @@ int main(int argc, char** argv) {
         schur_opt.read_sparse(C_fname, schur_opt, SchurOpt::WhichBlock::isC); // Hpl
         schur_opt.read_sparse(D_fname, schur_opt, SchurOpt::WhichBlock::isD); // Hpp
         // reference
-        schur_opt.read_sparse(Dschur_fname, schur_opt, SchurOpt::WhichBlock::isDschur_ref); // Hschur_ref
-    }
+        schur_opt.read_sparse(Dschur_fname, schur_opt, SchurOpt::WhichBlock::isDschur_ref); // Hschur_ref]
 
-    schur_opt.compute_schur();
-    schur_opt.verify_correctness();
-    // }
+        double average_runtime = 0;
+        double curr_runtime;
+        for (int i = 0; i < NUM_TRIALS; i++) {
+            schur_opt.compute_schur(&curr_runtime);
+            average_runtime += curr_runtime;
+        }
+
+        average_runtime = average_runtime / (double) NUM_TRIALS;
+        cout << "[STATS] " << "omp_num_threads= " << omp_num_threads << " " << "avg_tschur= " << average_runtime << " ms" << endl;
+        schur_opt.verify_correctness();
+
+    }
+    
     return 0;
 }

@@ -17,7 +17,7 @@ public:
     void from_g2o(/* parameters */);
     void to_g2o(/* parameters */);
 
-    void compute_schur(/* parameters */);
+    void compute_schur(double* runtime);
     void read_sparse(const std::string& fname, SchurOpt& schur_opt, WhichBlock which_block);
 
     void verify_correctness(/* parameters */);

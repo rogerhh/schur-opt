@@ -242,7 +242,7 @@ void matrix_sub(DPair omp_out,
  * By exploiting the block sparisty pattern of A, we can calculate Ck*inv(Ak)*Bk in parallel
  * each of Ck*inv(Ak)*Bk results in PxP summand which we will reduce in the end
  */
-void SchurOpt::compute_schur(/* parameters */) {
+void SchurOpt::compute_schur(double* runtime) {
     // We are going to assume all the matrices are set in a nice way
     std::chrono::steady_clock::time_point t_schur_start = std::chrono::steady_clock::now();
     
@@ -329,8 +329,8 @@ void SchurOpt::compute_schur(/* parameters */) {
     // cout << "num_cores= " << omp_num_threads << " t_schur = " << t_schur << endl;
     // cout << "Dschur[0, 0] = " << Dschur[0][0] << endl;
     // cout << "dschur addr at end = " << &Dschur << endl;
-    cout << "num_threads= " << omp_num_threads << " t_schur= " << t_schur << " P= " << P << " L= " << L << endl;
-
+    // cout << "num_threads= " << omp_num_threads << " t_schur= " << t_schur << " P= " << P << " L= " << L << endl;
+    *runtime = t_schur;
 }
 
 /**
