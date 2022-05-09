@@ -359,11 +359,18 @@ void SchurOpt::verify_correctness(/* parameters */) {
         // if (!Dschur_used[block_idx]) {
         //     continue; // skip as it is sparse
         // }
+        // cout << "Block block_idx = " << block_idx << endl;
         for (int val_idx = 0; val_idx < block_squared; val_idx++) {
+            // cout << Dschur[block_idx][val_idx] << " " << Dschur_ref[block_idx][val_idx] << endl;
             diff = Dschur_ref[block_idx][val_idx] - Dschur[block_idx][val_idx];
             se += diff*diff;
         }
     }
     double mse = se / (double) (P*P);
-    cout << "MSE: " << mse << endl;
+    if (mse < 1) {
+        cout << "[Correctness Passed] " << "MSE: " << mse << endl;
+    } else {
+        cout << "[Correctness FAILED] " << "MSE: " << mse << endl;
+    }
+
 }
