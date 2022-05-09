@@ -239,39 +239,48 @@ void SchurOpt::compute_schur(double* runtime) {
         }
 
     }
-
-    // // examine structure of A_inv_B
-    // int count = 0;
-    // for (int i = 0; i < A_inv_B_used.size(); i++) {
-    //     if (!A_inv_B_used[i]) count++;
+    // sparisty of C
+    // int sparse_block_count = 0;
+    // for (int i = 0; i < B_used.size(); i++) {
+    //     if (!B_used[i]) sparse_block_count++;
     // }
-    // cout << count << " out of " << A_inv_B_used.size() << " blocks of A_inv_B is sparse" << endl;
+    // cout << sparse_block_count << " out of " << B_used.size() << " blocks of C (B^T) is sparse" << endl;
+
+    // // // examine structure of A_inv_B
+    // sparse_block_count = 0;
+    // for (int i = 0; i < A_inv_B_used.size(); i++) {
+    //     if (!A_inv_B_used[i]) sparse_block_count++;
+    // }
+    // cout << sparse_block_count << " out of " << A_inv_B_used.size() << " blocks of A_inv_B is sparse" << endl;
 
     // 2. Calculate C (PxL) * A_inv_B (LxP) -> C A_inv_B (PxP)
-    // TO DO
-    // Approach 1: convert C and A_inv_B into an Eigen matrix
+    // TO DO: try convert C and A_inv_B into an Eigen matrix
 
+    // Current Approach: do operation directly on existing data structure
+    // this is a GEMM of operations on blocks that are row-majored
+    // significnat speed up after loop reordering, ikj
+    // for (i)(k)(j): Dschur[i][j] += C[i][k] * A_inv_B[k][j]
     Dschur = vector<vector<double>>(num_P_blocks * num_P_blocks, vector<double>(block_squared, 0)); 
     Dschur_used = vector<bool>(num_P_blocks * num_P_blocks, false);
 
-    // Apporach 2: do operation directly on existing data structure
-    // this is naive but i just want to get something working, we can optimize laterss
+    // 3. Calculate Dschur = D - C * A_inv_B
+    // initialize Dschur entry as corresponding data in D
+    #pragma omp parallel for
+    for (int blk_idx = 0; blk_idx  < num_P_blocks * num_P_blocks; blk_idx++) {
+        Dschur_used[blk_idx] = D_used[blk_idx];
+        if (D_used[blk_idx]) {
+            Dschur[blk_idx] = D[blk_idx]; // Dschur = D initializes
+        }
+    }
+
     #pragma omp parallel for
     for (int i = 0; i < num_P_blocks; i++) {
-        for (int j = 0; j < num_P_blocks; j++) {
-            // initialize Dschur entry as corresponding data in D
-            int ij_idx = pair_to_idx(i, j, num_P_blocks, num_P_blocks);
-            Dschur_used[ij_idx] = D_used[ij_idx];
-            if (D_used[ij_idx]) {
-                Dschur[ij_idx] = D[ij_idx]; // Dschur = D - CA-1B
-                // memcpy(&Dschur[ij_idx], &Dschur[ij_idx], block_squared*sizeof(double));
-            }
+        for (int k = 0; k < num_L_blocks; k++) {
+            for (int j = 0; j < num_P_blocks; j++) {
+                int ij_idx = pair_to_idx(i, j, num_P_blocks, num_P_blocks);
 
-            vector<double>& Dschur_ij = Dschur[ij_idx];
-            Eigen::Map<Matrix<double, 3, 3, RowMajor>> Dschur_ij_m(Dschur_ij.data());
-
-            // add inner product result, iterate over k, accumulate C_ik * A_inv_B_kj
-            for (int k = 0; k < num_L_blocks; k++) {
+                vector<double>& Dschur_ij = Dschur[ij_idx];
+                Eigen::Map<Matrix<double, 3, 3, RowMajor>> Dschur_ij_m(Dschur_ij.data());
 
                 // C_ik -> B_ki as C and B are tranpose
                 int ik_idx = pair_to_idx(k, i, num_L_blocks, num_P_blocks);
@@ -279,6 +288,7 @@ void SchurOpt::compute_schur(double* runtime) {
 
                 // skip if either entry is sparse 
                 if (!B_used[ik_idx] || !A_inv_B_used[kj_idx]) {
+                    // cout << "skip" << endl;
                     continue;
                 }
                 Dschur_used[ij_idx] = true;
@@ -292,14 +302,11 @@ void SchurOpt::compute_schur(double* runtime) {
                 Eigen::Map<Matrix<double, 3, 3, RowMajor>> A_inv_B_kj_m(A_inv_B_kj.data());
 
                 // need to transpose C_ik_m as data is stored in B originally
-                Dschur_ij_m = Dschur_ij_m - C_ik_m.transpose() * A_inv_B_kj_m;
+                Dschur_ij_m -= C_ik_m.transpose() * A_inv_B_kj_m;
             }
         }
     }
 
-
-    // 3. Calculate Dschur = D - C * A_inv_B
-    // TO DO
 
     chrono::steady_clock::time_point t_schur_end = chrono::steady_clock::now();
     double t_schur = chrono::duration_cast<chrono::duration<double, milli>>(t_schur_end - t_schur_start).count();

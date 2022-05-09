@@ -1,7 +1,9 @@
 #!/bin/bash  
 # CHOOSE TARGET
 
-exec_run="./build/driver.exe"
+exec_roger_run="./build/driver.exe"
+exec_simon_run="./build/driver_simon.exe"
+
 machine="a10"
 
 case $machine in
@@ -14,24 +16,19 @@ case $machine in
     ;;
 esac
 
-file_strongscaling=${PWD}/strongscaling.txt
 
 # profile scaling omp threads across all dataset
 cd ..
 
-# 1. make sure we have all the data needed generated
-#python3 sample_files.py -a 
-python3 sample_files.py -a
-
 # build binary
 (cd build && make)
-
-# clear file
-echo "Strong Scaling Profiling on $machine running $exec_run executable" &> $file_strongscaling
 
 # change num omp threads
 for (( num_thread=1; num_thread<=$NUM_MAX_THREADS; num_thread++ ))
 do  
 #    echo "Run experiments with $num_thread omp threads"
-    $exec_run -n $num_thread &>> $file_strongscaling
+    echo "Roger: individual blocking"
+    $exec_roger_run -n $num_thread
+    echo "Simon: dense GEMM"
+    $exec_simon_run -n $num_thread
 done
