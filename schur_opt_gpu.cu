@@ -529,7 +529,7 @@ void SchurOpt::compute_schur(/* parameters */) {
     chrono::steady_clock::time_point t_schur_end = chrono::steady_clock::now();
     double t_schur = chrono::duration_cast<chrono::duration<double, milli>>(t_schur_end - t_schur_start).count();
 
-    cout << "t_schur= " << t_schur << " ms" << endl;
+    cout << "[STATS] "  << "t_schur= " << t_schur << " ms" << endl;
 
 
     // cout << "Dschur: " << endl;

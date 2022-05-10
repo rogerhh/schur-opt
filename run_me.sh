@@ -1,3 +1,3 @@
 #!/bin/bash  
 
-./build/driver.exe
+./build/driver_gpu.exe
