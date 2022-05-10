@@ -17,50 +17,6 @@ void SchurOpt::to_g2o(/* parameters */) {
 }
 
 SchurOpt::~SchurOpt() {
-    if(A_gpu) {
-        cudaFree(A_gpu);
-        A_gpu = nullptr;
-    }
-    if(Ainv_gpu) {
-        cudaFree(Ainv_gpu);
-        Ainv_gpu = nullptr;
-    }
-    if(A_gpu_batch) {
-        cudaFree(A_gpu_batch);
-        A_gpu_batch = nullptr;
-    }
-    if(Ainv_gpu_batch) {
-        cudaFree(Ainv_gpu_batch);
-        Ainv_gpu_batch = nullptr;
-    }
-    if(B_gpu) {
-        cudaFree(B_gpu);
-        B_gpu = nullptr;
-    }
-    if(B_gpu_batch) {
-        cudaFree(B_gpu_batch);
-        B_gpu_batch = nullptr;
-    }
-    if(C_gpu) {
-        cudaFree(C_gpu);
-        C_gpu = nullptr;
-    }
-    if(C_gpu_batch) {
-        cudaFree(C_gpu_batch);
-        C_gpu_batch = nullptr;
-    }
-    if(CAinv_gpu) {
-        cudaFree(CAinv_gpu);
-        CAinv_gpu = nullptr;
-    }
-    if(CAinv_gpu_batch) {
-        cudaFree(CAinv_gpu_batch);
-        CAinv_gpu_batch = nullptr;
-    }
-    if(D_gpu) {
-        cudaFree(D_gpu);
-        D_gpu = nullptr;
-    }
 }
 
 // For CUBLAS, this needs to be column major
@@ -333,11 +289,7 @@ void SchurOpt::verify_correctness(/* parameters */) {
     cout << "MSE: " << mse << endl;
 }
 
-void SchurOpt::compute_Ainv() {
-    cudaError_t cudaStat;
-    cublasStatus_t stat;
-    cublasHandle_t handle;
-
+void SchurOpt::mem_alloc() {
     stat = cublasCreate(&handle);
     if(stat != CUBLAS_STATUS_SUCCESS) {
         print_error_and_exit("CUBLAS initialization failed");
@@ -387,59 +339,9 @@ void SchurOpt::compute_Ainv() {
         print_error_and_exit("CUBLAS vector copy failed: Ainv_gpu_batch");
     }
 
-    int* info_gpu;
     cudaStat = cudaMalloc((void**) &info_gpu, batch_size * sizeof(int));
     if(cudaStat != cudaSuccess) {
         print_error_and_exit("Error: Device memory allocation failure: info_gpu");
-    }
-
-
-    stat = cublasDmatinvBatched(handle, 3, A_gpu_batch, 3, Ainv_gpu_batch, 3, info_gpu, batch_size);
-    if(stat != CUBLAS_STATUS_SUCCESS) {
-        print_error_and_exit("Error: Inverting A");
-    }
-
-    Ainv = vector<double>(A_sparse.size(), 0);
-    stat = cublasGetVector(A_sparse.size(), sizeof(double), Ainv_gpu, 1, Ainv.data(), 1);   
-    if(stat != CUBLAS_STATUS_SUCCESS) {
-        print_error_and_exit("Error: Getting vector");
-    }
-
-    for(int i = 0; i < 5; i++) {
-        for(int j = 0; j < 3; j++) {
-            for(int k = 0; k < 3; k++) {
-                cout << A_sparse[i * 9 + j * 3 + k] << " "; 
-            }
-            cout << endl;
-        }
-        cout << endl;
-        for(int j = 0; j < 3; j++) {
-            for(int k = 0; k < 3; k++) {
-                cout << Ainv[i * 9 + j * 3 + k] << " "; 
-            }
-            cout << endl;
-        }
-        cout << endl << endl;
-    }
-
-    cudaFree(info_gpu);
-    info_gpu = nullptr;
-    cublasDestroy(handle);
-}
-
-void SchurOpt::compute_schur(/* parameters */) {
-    compute_Ainv();
-
-    cudaError_t cudaStat;
-    cublasStatus_t stat;
-    cublasHandle_t handle;
-    cublasOperation_t transa = CUBLAS_OP_N;
-    cublasOperation_t transb = CUBLAS_OP_N;
-    cublasOperation_t transt = CUBLAS_OP_T;
-
-    stat = cublasCreate(&handle);
-    if(stat != CUBLAS_STATUS_SUCCESS) {
-        print_error_and_exit("CUBLAS initialization failed");
     }
 
     cudaStat = cudaMalloc((void**) &C_gpu, C.size() * sizeof(double));
@@ -485,6 +387,96 @@ void SchurOpt::compute_schur(/* parameters */) {
         print_error_and_exit("CUBLAS vector copy failed: Ainv_gpu_batch");
     }
 
+    cudaStat = cudaMalloc((void**) &D_gpu, D.size() * sizeof(double*));
+    if(cudaStat != cudaSuccess) {
+        print_error_and_exit("Error: Device memory allocation failure for D_gpu");
+    }
+
+    stat = cublasSetVector(D.size(), sizeof(double), D.data(), 1, D_gpu, 1);
+    if(stat != CUBLAS_STATUS_SUCCESS) {
+        print_error_and_exit("CUBLAS vector copy failed: D_gpu");
+    }
+
+}
+
+void SchurOpt::mem_dealloc() {
+    if(A_gpu) {
+        cudaFree(A_gpu);
+        A_gpu = nullptr;
+    }
+    if(Ainv_gpu) {
+        cudaFree(Ainv_gpu);
+        Ainv_gpu = nullptr;
+    }
+    if(A_gpu_batch) {
+        cudaFree(A_gpu_batch);
+        A_gpu_batch = nullptr;
+    }
+    if(Ainv_gpu_batch) {
+        cudaFree(Ainv_gpu_batch);
+        Ainv_gpu_batch = nullptr;
+    }
+    if(B_gpu) {
+        cudaFree(B_gpu);
+        B_gpu = nullptr;
+    }
+    if(B_gpu_batch) {
+        cudaFree(B_gpu_batch);
+        B_gpu_batch = nullptr;
+    }
+    if(C_gpu) {
+        cudaFree(C_gpu);
+        C_gpu = nullptr;
+    }
+    if(C_gpu_batch) {
+        cudaFree(C_gpu_batch);
+        C_gpu_batch = nullptr;
+    }
+    if(CAinv_gpu) {
+        cudaFree(CAinv_gpu);
+        CAinv_gpu = nullptr;
+    }
+    if(CAinv_gpu_batch) {
+        cudaFree(CAinv_gpu_batch);
+        CAinv_gpu_batch = nullptr;
+    }
+    if(D_gpu) {
+        cudaFree(D_gpu);
+        D_gpu = nullptr;
+    }
+    if(info_gpu) {
+        cudaFree(info_gpu);
+        info_gpu = nullptr;
+    }
+    cublasDestroy(handle);
+}
+
+void SchurOpt::compute_Ainv() {
+
+
+    stat = cublasDmatinvBatched(handle, 3, A_gpu_batch, 3, Ainv_gpu_batch, 3, info_gpu, batch_size);
+    if(stat != CUBLAS_STATUS_SUCCESS) {
+        print_error_and_exit("Error: Inverting A");
+    }
+
+    Ainv = vector<double>(A_sparse.size(), 0);
+    stat = cublasGetVector(A_sparse.size(), sizeof(double), Ainv_gpu, 1, Ainv.data(), 1);   
+    if(stat != CUBLAS_STATUS_SUCCESS) {
+        print_error_and_exit("Error: Getting vector");
+    }
+
+}
+
+void SchurOpt::compute_schur(/* parameters */) {
+    mem_alloc();
+
+    compute_Ainv();
+
+    cublasOperation_t transa = CUBLAS_OP_N;
+    cublasOperation_t transb = CUBLAS_OP_N;
+    cublasOperation_t transt = CUBLAS_OP_T;
+
+
     double alpha = 1, beta = 0;
 
     stat = cublasDgemmBatched(handle, 
@@ -512,16 +504,6 @@ void SchurOpt::compute_schur(/* parameters */) {
     //     cout << CAinv[i] << endl;
     // }
 
-    cudaStat = cudaMalloc((void**) &D_gpu, D.size() * sizeof(double*));
-    if(cudaStat != cudaSuccess) {
-        print_error_and_exit("Error: Device memory allocation failure for D_gpu");
-    }
-
-    stat = cublasSetVector(D.size(), sizeof(double), D.data(), 1, D_gpu, 1);
-    if(stat != CUBLAS_STATUS_SUCCESS) {
-        print_error_and_exit("CUBLAS vector copy failed: D_gpu");
-    }
-
     alpha = -1; // D - CAinvB
     beta = 1;
 
@@ -546,5 +528,5 @@ void SchurOpt::compute_schur(/* parameters */) {
     //     cout << Dschur[i] << endl;
     // }
 
-    cublasDestroy(handle);
+    mem_dealloc();
 }

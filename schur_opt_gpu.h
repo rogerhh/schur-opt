@@ -3,6 +3,8 @@
 
 #include <vector>
 #include <string>
+#include <cuda_runtime.h>
+#include "cublas_v2.h"
 
 class SchurOpt {
 
@@ -25,6 +27,8 @@ public:
 private:
 
     void compute_Ainv();
+    void mem_alloc();
+    void mem_dealloc();
 
     const int block_size = 3;
     const int block_squared = block_size * block_size;
@@ -60,6 +64,11 @@ private:
     double* CAinv_gpu = nullptr;
     double** CAinv_gpu_batch = nullptr;
     double* D_gpu = nullptr;
+    int* info_gpu = nullptr;
+
+    cudaError_t cudaStat;
+    cublasStatus_t stat;
+    cublasHandle_t handle;
 
     int batch_size = 0;
 };
