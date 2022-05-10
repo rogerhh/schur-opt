@@ -21,6 +21,32 @@ public:
     void read_sparse(const std::string& fname, SchurOpt& schur_opt, WhichBlock which_block);
 
     void verify_correctness(/* parameters */);
+
+    struct DPair {
+        // vector<vector<double>>* Dschur_ptr;
+        // vector<bool>* Dschur_used_ptr;
+        std::vector<std::vector<double>> Dschur_ptr;
+        std::vector<bool> Dschur_used_ptr;
+
+        DPair(int num_blocks, int block_squared) {
+            // Dschur_ptr = nullptr;
+            // Dschur_used_ptr = nullptr;
+            Dschur_ptr = std::vector<std::vector<double>>(num_blocks, std::vector<double>(block_squared, 0));
+            Dschur_used_ptr = std::vector<bool>(num_blocks, false);
+
+        }
+
+        DPair() {}
+
+        DPair(std::vector<std::vector<double>>& Dschur_in, std::vector<bool>& Dschur_used_in) {
+            Dschur_ptr = Dschur_in;
+            Dschur_used_ptr = Dschur_used_in;
+            // Dschur_ptr = Dschur_in;
+            // Dschur_used_ptr = Dschur_used_in;
+        }
+    };
+
+    void init();
     
 private:
 
@@ -54,6 +80,11 @@ private:
     std::vector<std::vector<double>> Dschur_ref;
     std::vector<bool> Dschur_ref_used;
     std::vector<double> bschur_ref;
+
+
+    std::vector<DPair> dpair_arr;
+    DPair dpair;
+    DPair dpair_init;
 };
 
 #endif

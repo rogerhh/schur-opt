@@ -14,6 +14,7 @@ using namespace std;
 using std::tie;
 using Eigen::Matrix;
 using Eigen::RowMajor;
+using DPair=SchurOpt::DPair;
 
 void SchurOpt::from_g2o(/* parameters */) {
     // TO DO
@@ -181,27 +182,6 @@ void SchurOpt::read_sparse(const string& fname, SchurOpt& schur_opt, WhichBlock 
  * Wrapper data structure for reducing Dschur matrix
  * contains pointer to stored data as well as bool flag
  */
-struct DPair {
-    // vector<vector<double>>* Dschur_ptr;
-    // vector<bool>* Dschur_used_ptr;
-    vector<vector<double>> Dschur_ptr;
-    vector<bool> Dschur_used_ptr;
-
-    DPair(int num_blocks, int block_squared) {
-        // Dschur_ptr = nullptr;
-        // Dschur_used_ptr = nullptr;
-        Dschur_ptr = vector<vector<double>>(num_blocks, vector<double>(block_squared, 0));
-        Dschur_used_ptr = vector<bool>(num_blocks, false);
-
-    }
-
-    DPair(vector<vector<double>>& Dschur_in, vector<bool>& Dschur_used_in) {
-        Dschur_ptr = Dschur_in;
-        Dschur_used_ptr = Dschur_used_in;
-        // Dschur_ptr = Dschur_in;
-        // Dschur_used_ptr = Dschur_used_in;
-    }
-};
 
 /**
  * Reduction function on DSchur (PxP) matrixes
@@ -246,13 +226,24 @@ void matrix_add(DPair& omp_out,
     return;
 }
 
-DPair dpair_init() {
-    cout << "init" << endl;
-    return DPair(4, 9);
-}
-
 // Declaration of OpenMP reduction on DSchur
 #pragma omp declare reduction(matrix_add : DPair : matrix_add(omp_out, omp_in)) initializer(omp_priv=omp_orig)
+
+void SchurOpt::init() {
+    int num_P_blocks = P / 3;
+    int num_L_blocks = L / 3;
+
+    Dschur = D;
+    Dschur_used = D_used;
+    dpair = DPair(Dschur, Dschur_used);
+    dpair_init = DPair(num_P_blocks * num_P_blocks, block_squared);
+    dpair_arr.clear();
+    for(int i = 0; i < omp_num_threads; i++) {
+        // dpair_arr.push_back(DPair(Dschur_local_arr[i], Dschur_used_local_arr[i]));
+        dpair_arr.push_back(DPair(num_P_blocks * num_P_blocks, block_squared));
+    }
+
+}
 
 /**
  * Compute the Schur component S = D-Cinv(A)B
@@ -271,16 +262,6 @@ void SchurOpt::compute_schur(/* parameters */) {
     
     omp_set_num_threads(omp_num_threads);
 
-    Dschur = D;
-    Dschur_used = D_used;
-    DPair dpair(Dschur, Dschur_used);
-    DPair dpair_init(DPair(num_P_blocks * num_P_blocks, block_squared));
-    vector<DPair> dpair_arr;
-    for(int i = 0; i < omp_num_threads; i++) {
-        // dpair_arr.push_back(DPair(Dschur_local_arr[i], Dschur_used_local_arr[i]));
-        dpair_arr.push_back(DPair(num_P_blocks * num_P_blocks, block_squared));
-    }
-
     #pragma omp parallel default(shared) 
     {
         int omp_id = omp_get_thread_num();
@@ -293,9 +274,9 @@ void SchurOpt::compute_schur(/* parameters */) {
 
         // parallelize across number of block diagonal matrix in A
         // calculate Ck*inv(Ak)*Bk in parallel
-        #pragma omp for
+        #pragma omp for schedule(static)
         for(int i = 0; i < A_sparse.size(); i++) {
-            
+
             // Ck*inv(Ak)*Bk can be calculated as an outer product between
             // Ck (Pxb) * inv(Ak) (bxb) * Bk (bxP)
 
@@ -342,10 +323,10 @@ void SchurOpt::compute_schur(/* parameters */) {
                 }
             }
         }
-    #pragma omp barrier
     }
 
     // cout << omp_num_threads << endl;
+    std::chrono::steady_clock::time_point t_schur_add = std::chrono::steady_clock::now();
 
     #pragma omp parallel for reduction(matrix_add : dpair_init)
     for(int i = 0; i < omp_num_threads; i++) {
@@ -357,11 +338,13 @@ void SchurOpt::compute_schur(/* parameters */) {
     // cout << "end " << Dschur[0][0] << endl;
 
     chrono::steady_clock::time_point t_schur_end = chrono::steady_clock::now();
-    double t_schur = chrono::duration_cast<chrono::duration<double, milli>>(t_schur_end - t_schur_start).count();
-    // cout << "num_cores= " << omp_num_threads << " t_schur = " << t_schur << endl;
+    //double t_schur = chrono::duration_cast<chrono::duration<double, milli>>(t_schur_end - t_schur_start).count();
+    double t_add = chrono::duration_cast<chrono::duration<double, milli>>(t_schur_end - t_schur_add).count();
+    double t_mult = chrono::duration_cast<chrono::duration<double, milli>>(t_schur_add - t_schur_start).count();
+    // cout << "num_cores= " << omp_num_threads << " t_add = " << t_add << " t_mult = " << t_mult << endl;
     // cout << "Dschur[0, 0] = " << Dschur[0][0] << endl;
     // cout << "dschur addr at end = " << &Dschur << endl;
-    cout << "num_threads= " << omp_num_threads << " t_schur= " << t_schur << " P= " << P << " L= " << L << endl;
+    // cout << "num_threads= " << omp_num_threads << " t_schur= " << t_schur << " t_add=" << t_add << " P= " << P << " L= " << L << endl;
 
 }
 
