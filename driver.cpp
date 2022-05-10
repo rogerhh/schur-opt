@@ -29,8 +29,8 @@ int main(int argc, char** argv) {
 
     // initialize solver based on num_threads set
     SchurOpt schur_opt(omp_num_threads);
-
-        string list_fname = "../data/filelist.csv";
+        string list_fname = "filelist_sample.csv";
+        // string list_fname = "../data/filelist.csv";
         ifstream list_fin(list_fname);
         if(!list_fin.is_open()) {
             cerr << "Error opening file: " << list_fname << endl;

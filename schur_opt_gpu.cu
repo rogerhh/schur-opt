@@ -5,6 +5,7 @@
 #include <cuda_runtime.h>
 #include "cublas_v2.h"
 #include "schur_opt_gpu.h"
+#include <chrono>
 
 using namespace std;
 
@@ -470,6 +471,8 @@ void SchurOpt::compute_Ainv() {
 void SchurOpt::compute_schur(/* parameters */) {
     mem_alloc();
 
+    std::chrono::steady_clock::time_point t_schur_start = std::chrono::steady_clock::now();
+
     compute_Ainv();
 
     cublasOperation_t transa = CUBLAS_OP_N;
@@ -522,6 +525,12 @@ void SchurOpt::compute_schur(/* parameters */) {
     if(stat != CUBLAS_STATUS_SUCCESS) {
         print_error_and_exit("Error getting data: Dschur");
     }
+
+    chrono::steady_clock::time_point t_schur_end = chrono::steady_clock::now();
+    double t_schur = chrono::duration_cast<chrono::duration<double, milli>>(t_schur_end - t_schur_start).count();
+
+    cout << "t_schur= " << t_schur << " ms" << endl;
+
 
     // cout << "Dschur: " << endl;
     // for(int i = 0; i < 200; i++) {

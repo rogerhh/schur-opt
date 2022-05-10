@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
 
     SchurOpt schur_opt;
 
-    string list_fname = "../data/filelist.csv";
+    string list_fname = "filelist_sample.csv";
     ifstream list_fin(list_fname);
     if(!list_fin.is_open()) {
         cerr << "Error opening file: " << list_fname << endl;
@@ -43,6 +43,8 @@ int main(int argc, char** argv) {
 
     schur_opt.compute_schur();
     schur_opt.verify_correctness();
+
+
 
     return 0;
 }
